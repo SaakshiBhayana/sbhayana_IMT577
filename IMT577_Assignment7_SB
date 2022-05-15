@@ -1,0 +1,155 @@
+/*
+Saakshi Bhayana
+Assignment 7
+
+Date: 05/09/2022*/
+
+USE IMT577_DW_SAAKSHI_BHAYANA
+
+
+-- 1. Create Table : Fact_ProductSalesTarget
+
+CREATE TABLE Fact_ProductSalesTarget
+(
+  DimProductID INTEGER CONSTRAINT FK_DimProductID FOREIGN KEY REFERENCES Dim_Product(DimProductID), --Foreign Key
+  DimTargetDateID NUMBER(9) CONSTRAINT FK_DimTargetDateID FOREIGN KEY REFERENCES Dim_Date(Date_Pkey), --Foreign Key
+  ProductTargetSaleQuantity INTEGER NOT NULL
+);
+
+INSERT INTO Fact_ProductSalesTarget 
+    (DimProductID, 
+     DimTargetDateID, 
+     ProductTargetSaleQuantity)
+SELECT Distinct 
+    DimProductID, 
+    Dim_Date.Date_Pkey AS DimTargetDateID, 
+    Round(Stage_TargetDataProduct.SalesQuantityTarget/ 365, 2)  AS ProductTargetSaleQuantity
+FROM Stage_TargetDataProduct
+INNER JOIN Dim_Product ON  
+    Stage_TargetDataProduct.ProductID = Dim_Product.ProductID 
+INNER JOIN Dim_Date ON 
+   Stage_TargetDataProduct.YEAR = Dim_Date.YEAR
+
+
+-- SELECT * FROM Fact_ProductSalesTarget 
+
+-- DROP TABLE Fact_ProductSalesTarget  
+_____________________________________________________________________________________________________________________________________________________________________________________________
+
+
+-- 2. Create Table : Fact_SRCSalesTarget
+
+CREATE TABLE Fact_SRCSalesTarget
+(
+  DimStoreID INTEGER CONSTRAINT FK_DimStoreID FOREIGN KEY REFERENCES Dim_Store(DimStoreID), --Foreign Key
+  DimResellerID INTEGER CONSTRAINT FK_DimSResellerID FOREIGN KEY REFERENCES Dim_Reseller(DimResellerID), --Foreign Key 
+  DimChannelID INTEGER CONSTRAINT FK_DimustomerID FOREIGN KEY REFERENCES Dim_Customer(DimCustomerID), --Foreign Key
+  DimTargetDateID NUMBER(9) CONSTRAINT FK_DimTargetDateID FOREIGN KEY REFERENCES Dim_Date(Date_Pkey), --Foreign Key
+  SalesTargetAmount FLOAT NOT NULL
+  );
+
+INSERT INTO Fact_SRCSalesTarget 
+(DimStoreID , 
+ DimResellerID , 
+ DimChannelID, 
+ DimTargetDateID, 
+ SalesTargetAmount )
+select DISTINCT 
+    CASE
+      WHEN TargetName = 'Store Number 5' then 5
+      WHEN TargetName = 'Store Number 8' then 8
+      WHEN TargetName = 'Store Number 10' then 10
+      WHEN Targetname = 'Store Number 21' then 21
+      WHEN TargetName = 'Store Number 34' then 34
+      WHEN TargetName = 'Store Number 39' then 39
+      else -1
+      END as DimStoreID , 
+    NVL(DimResellerID, -1) , 
+    DimChannelID,
+    Dim_Date.Date_Pkey AS DimTargetDateID, 
+    Round(Stage_Target_SRC.TARGETSALESAMOUNT/365, 2) AS SalesTargetAmount
+FROM Stage_Target_SRC 
+LEFT JOIN Dim_Channel ON
+   Dim_Channel.ChannelName = Stage_Target_SRC.ChannelName 
+LEFT JOIN Dim_Reseller ON 
+   Stage_Target_SRC.TargetName = Dim_Reseller.ResellerName
+LEFT JOIN Dim_Date ON 
+   Stage_Target_SRC.YEAR = Dim_Date.YEAR
+ 
+-- SELECT * from Fact_SRCSalesTarget
+
+-- DROP TABLE Fact_SRCSalesTarget
+
+_____________________________________________________________________________________________________________________________________________________________________________________________
+
+-- 3. Create Table : Fact_SalesActual
+
+
+CREATE TABLE Fact_SalesActual
+(
+  DimProductID INTEGER CONSTRAINT FK_DimProductID FOREIGN KEY REFERENCES Dim_Product(DimProductID), --Foreign Key
+  DimStoreID INTEGER CONSTRAINT FK_DimStoreID FOREIGN KEY REFERENCES Dim_Store(DimStoreID), --Foreign Key
+  DimResellerID INTEGER CONSTRAINT FK_DimSResellerID FOREIGN KEY REFERENCES Dim_Reseller(DimResellerID), --Foreign Key 
+  DimCustomerID INTEGER CONSTRAINT FK_DimustomerID FOREIGN KEY REFERENCES Dim_Customer(DimCustomerID), --Foreign Key
+  DimChannelID INTEGER CONSTRAINT FK_DimChannelID FOREIGN KEY REFERENCES Dim_Channel(DimChannelID),--Foreign Key
+  DimSaleDateID Number (9) CONSTRAINT FK_DimSaleDateID FOREIGN KEY REFERENCES Dim_Date(Date_Pkey), --Foreign Key
+  DimLocationID INTEGER CONSTRAINT FK_DimLocationID FOREIGN KEY REFERENCES Dim_Location(DimLocationID), --Foreign Key
+  SalesHeaderID INTEGER NOT NULL,
+  SalesDetailID INTEGER NOT NULL,
+  SalesAmount FLOAT NOT NULL,
+  SalesQuantity INTEGER NOT NULL,
+  SaleUnitPrice FLOAT NOT NULL,
+  SaleExtendedCost FLOAT NOT NULL,
+  SaleTotalProfit FLOAT NOT NULL
+);
+
+INSERT INTO Fact_SalesActual  
+  (DimProductID
+   ,DimStoreID
+   ,DimResellerID
+   ,DimCustomerID 
+   ,DimChannelID
+   ,DimSaleDateID 
+   ,DimLocationID
+   ,SalesHeaderID  
+   ,SalesDetailID
+   ,SalesAmount
+   ,SalesQuantity
+   ,SaleUnitPrice
+   ,SaleExtendedCost
+   ,SaleTotalProfit
+    )
+SELECT 
+     Dim_Product.DimProductID 
+    ,NVL(Dim_Store.DimStoreID, -1)
+    ,NVL(Dim_Reseller.DimResellerID, -1) 
+    ,NVL(Dim_Customer.DimCustomerID , -1)
+    ,Dim_Channel.DimChannelID  
+    ,CAST(REPLACE(REPLACE(CAST(Stage_SalesHeader.DATE AS DATE), '00', '20'), '-', '') AS NUMBER(9)) AS DimSaleDateID 
+    ,NVL(Dim_Location.DimLocationID, -1)
+    ,Stage_SalesHeader.SalesHeaderID 
+    ,Stage_SalesDetail.SALEDDETAILID
+    ,SalesAmount
+    ,SalesQuantity
+    ,(SalesAmount/SalesQuantity) AS Sales_Unit_Price
+    ,CASE when (SalesAmount / SalesQuantity) = Dim_Product.ProductRetailPrice then Dim_Product.ProductRetailPrice else Dim_Product.ProductWholesalePrice end AS Extended_Cost
+    ,Sales_Unit_Price - Dim_Product.ProductCost AS SaleTotalProfit     
+FROM Stage_SalesDetail
+INNER JOIN Stage_SalesHeader ON 
+    Stage_SalesDetail.SalesHeaderID =  Stage_SalesHeader.SalesHeaderID 
+INNER JOIN Dim_Product ON 
+    Dim_Product.ProductID = Stage_SalesDetail.ProductID
+INNER JOIN Dim_Channel ON
+    Dim_Channel.SourceChannelID = Stage_SalesHeader.ChannelID
+LEFT JOIN Dim_Store ON
+    Dim_Store.StoreID = Stage_SalesHeader.StoreID
+LEFT JOIN Dim_Location ON
+    Dim_Store.DimLocationID = Dim_Location.DimLocationID
+LEFT JOIN Dim_Customer ON
+    Stage_SalesHeader.CustomerID = Dim_Customer.SourceCustomerID 
+LEFT JOIN Dim_Reseller ON
+    Dim_Reseller.SourceResellerID = Stage_SalesHeader.ResellerID;
+    
+-- SELECT * FROM Fact_SalesActual
+
+-- DROP TABLE Fact_SalesActual
