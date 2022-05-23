@@ -1,0 +1,113 @@
+Module 8 : Views Only
+
+/*
+Saakshi Bhayana
+Assignment 8
+
+Date: 05/22/2022*/
+
+/*
+CREATE VIEW view_name AS
+SELECT column1, column2, ...
+FROM table_name
+WHERE condition;
+*/
+
+USE IMT577_DW_SAAKSHI_BHAYANA
+
+-- View 1
+
+CREATE OR REPLACE SECURE VIEW VIEW_Overall_sales
+AS
+SELECT DISTINCT c.DIMSTOREID,c.YEAR,c.SALESAMOUNT,c.SALESTARGETAMOUNT
+FROM (
+  SELECT DISTINCT a.DIMSTOREID, a.YEAR, b.SALESAMOUNT, a.SALESTARGETAMOUNT
+  FROM (
+    SELECT DIMSTOREID,  LEFT(CAST(DIMTARGETDATEID AS varchar(8)),4) as YEAR, SALESTARGETAMOUNT
+    FROM FACT_SRCSALESTARGET
+    WHERE DIMSTOREID <> -1
+  ) a
+INNER JOIN (
+  SELECT DIMSTOREID, SUM(SALESAMOUNT) as SALESAMOUNT, YEAR
+  FROM (
+      SELECT DIM_STORE.STORENUMBER AS DimStoreID, DIMSALEDATEID, SALESAMOUNT, LEFT(CAST(DIMSALEDATEID AS varchar(8)),4) as YEAR
+      FROM FACT_SALESACTUAL
+      Join Dim_Store ON Dim_Store.DimStoreID = Fact_SalesActual.DimStoreID
+    ) 
+    GROUP BY YEAR, DIMSTOREID
+  ) b
+ON a.DIMSTOREID= b.DIMSTOREID
+AND a.YEAR = b.YEAR
+) c 
+INNER JOIN DIM_STORE
+ON c.DIMSTOREID = DIM_STORE.STORENUMBER;
+
+-- DROP VIEW Overall_sales
+
+-- Test View 1
+SELECT * FROM VIEW_Overall_sales
+WHERE DimStoreID In(10,21)
+ORDER BY DimStoreID
+
+------------------------------------------------------------------------------------------------------------------ 
+
+-- View 2
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_vs_Target
+AS
+(
+SELECT YEAR, STORENUMBER, SUM(SalesTargetAmount) AS SalesTargetAmount, SUM(SalesAmount) AS SalesAmount, 
+ROUND((SUM(SalesAmount)/SUM(SalesTargetAmount))*100,2) AS TargetAchieved
+FROM 
+(
+SELECT c.Year, b.StoreNumber, SUM(a.SalesTargetAmount) AS SalesTargetAmount, 0 AS SalesAmount
+FROM Fact_SRCSalesTarget a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.StoreNumber
+Inner JOIN Dim_Date c
+  ON a.DimTargetDateID = c.Date_PKEY
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+
+UNION 
+
+SELECT c.Year, b.StoreNumber, 0 AS SalesTargetAmount, SUM(a.SalesAmount) AS SalesAmount
+FROM Fact_SalesActual a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.DimStoreID
+INNER JOIN Dim_Date c
+  ON a.DimSaleDateID = c.DATE_PKEY 
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+)
+GROUP BY YEAR, STORENUMBER
+ORDER BY YEAR
+);
+    
+--Select * From  VIEW_Sales_vs_Target
+--Drop View VIEW_Sales_vs_Target
+
+------------------------------------------------------------------------------------------------------------------
+
+-- View 3
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_by_Day
+AS
+SELECT a.DimStoreID, SUM(SalesAmount) as SalesAmount, c.Day_Name, c.Day_Num_In_Week AS Day_Number
+FROM Fact_SalesActual a 
+    Inner JOIN Dim_Store b
+        ON a.DimStoreID = b.DimStoreID
+    Inner JOIN Dim_Date c
+        ON a.DimSaleDateID = c.Date_PKEY
+        Where a.DimStoreID = 4 OR a.DimStoreID = 6
+    Group by Day_Name, Day_Number, a.DimStoreID
+    ORDER BY Day_Number, DimStoreID;
+    
+--Drop View VIEW_Sales_by_Day
+
+-- Test View 3
+
+SELECT * FROM VIEW_Sales_by_Day
+WHERE Day_Name = 'Friday' OR Day_Name = 'Saturday' OR Day_Name = 'Sunday'
+------------------------------------------------------------------------------------------------------------------
+
+
+
