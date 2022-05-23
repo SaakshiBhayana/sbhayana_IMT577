@@ -1,0 +1,1127 @@
+/*
+Saakshi Bhayana
+Assignment 8
+Final Data Warehouse Submission
+
+Date: 05/22/2022*/
+
+USE IMT577_DW_SAAKSHI_BHAYANA
+
+-------DIMENSION TABLES-------
+
+-- 1. CREATING DIMENSIONAL TABLE "DIM_LOCATION"
+
+CREATE TABLE Dim_Location(
+    DimLocationID INT IDENTITY(1,1) CONSTRAINT PK_DimLocationID PRIMARY KEY NOT NULL --Surrogate Key
+    ,Address VARCHAR(255) NOT NULL 
+    ,City VARCHAR(255) NOT NULL
+    ,PostalCode INTEGER NOT NULL
+    ,StateProvince VARCHAR(255) NOT NULL
+    ,Country VARCHAR(255) NOT NULL
+);
+
+-- Handling NULL values - Filling up Row 1 with -1 for Integer and 'unknown' for varchar. 
+INSERT INTO Dim_Location (Address, City, PostalCode, StateProvince, Country)
+VALUES ('Unknown','Unknown', -1, 'Unknown', 'Unknown');
+
+-- Inserting values from from 3 tables - Customer, Store and reseller (TOTAL 13 ROWS)
+INSERT INTO Dim_Location (Address, City, PostalCode, StateProvince, Country)
+SELECT distinct  Address, City, PostalCode, StateProvince, Country
+FROM Stage_Customer
+union 
+SELECT distinct Address, City, PostalCode, StateProvince, Country
+FROM Stage_Store
+union
+SELECT distinct Address, City, PostalCode, StateProvince, Country
+FROM Stage_Reseller
+
+-- DROP Table Dim_Location (Had to use this option several times to fix errors)
+
+-- Checking no. of rows in each of the three tables
+SELECT* FROM Stage_Customer -- 3 ROWS
+SELECT* FROM Stage_Store    -- 6 ROWS
+SELECT* FROM Stage_Reseller -- 4 ROWS
+
+-- Checking no. of rows in the table Dim_Location 
+SELECT* FROM Dim_Location -- TOTAL 14 ROWS
+
+____________________________________________________________________________________________________________________________________
+
+-- 2. CREATING DIMENSIONAL TABLE "DIM_CUSTOMER" 
+
+CREATE TABLE Dim_Customer(
+  DimCustomerID INTEGER IDENTITY(1,1) CONSTRAINT PK_dimCustomer PRIMARY KEY NOT NULL -- SurrogateKey     
+  ,DimLocationID INTEGER CONSTRAINT FK_DimLocationIDCustomer FOREIGN KEY REFERENCES Dim_Location (DimLocationID) NOT NULL
+  ,SourceCustomerID VARCHAR(255) NOT NULL 
+  ,FullName VARCHAR(255) NOT NULL 
+  ,FirstName VARCHAR(255) NOT NULL 
+  ,LastName VARCHAR(255) NOT NULL 
+  ,Gender VARCHAR(255) NOT NULL
+  ,EmailAddress VARCHAR(255) NOT NULL
+  ,PhoneNumber VARCHAR(255) NOT NULL
+  );
+
+-- Handling NULL values 
+INSERT INTO Dim_Customer (DimLocationID, SourceCustomerID, FullName, FirstName, LastName, Gender, EmailAddress, PhoneNumber)
+VALUES (-1,'Unknown','Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown', 'Unknown');
+
+-- Inserting values Stage_Customer
+INSERT INTO Dim_Customer (DimLocationID, SourceCustomerID, FullName, FirstName, LastName, Gender, EmailAddress, PhoneNumber)
+SELECT distinct DimLocationID, CustomerID AS SourceCustomerID, CONCAT(FirstName,' ', LastName) AS FullName, FirstName, LastName, Gender, EmailAddress, PhoneNumber
+FROM Stage_Customer
+JOIN Dim_Location where Stage_Customer.Address = Dim_Location.Address
+
+
+-- Select CONCAT(FirstName,' ', LastName) from Stage_Customer
+-- DROP TABLE Dim_Customer
+SELECT* FROM Dim_Customer
+
+--SELECT* FROM Stage_Customer
+____________________________________________________________________________________________________________________________________
+
+--3. CREATING DIMENSIONAL TABLE "DIM_STORE"
+
+CREATE TABLE Dim_Store(
+  DimStoreID INTEGER IDENTITY(1,1) CONSTRAINT PK_DimStore PRIMARY KEY NOT NULL -- SurrogateKey     
+  ,DimLocationID INTEGER CONSTRAINT FK_DimLocationIDStore FOREIGN KEY REFERENCES Dim_Location (DimLocationID) NOT NULL
+  ,StoreID INTEGER
+  ,StoreNumber INTEGER
+  ,StoreManager VARCHAR(255) NOT NULL 
+  );
+
+-- Handling NULL values
+INSERT INTO Dim_Store(DimLocationID, StoreID,StoreNumber,StoreManager)
+Values (-1, -1, -1 ,'Unknown'); 
+
+-- Inserting values Stage_Store
+INSERT INTO Dim_Store(DimLocationID, StoreID,StoreNumber,StoreManager)
+SELECT distinct DimLocationID, StoreID, StoreNumber, StoreManager
+FROM Stage_Store
+JOIN Dim_Location WHERE Stage_Store.Address = Dim_Location.Address
+
+
+SELECT* FROM Dim_Store 
+
+-- DROP Table Dim_Store
+-- SELECT* FROM Stage_Store -- 6 ROWS
+
+____________________________________________________________________________________________________________________________________
+
+-- 4. CREATING DIMENSIONAL TABLE "DIM_RESELLER"
+
+CREATE TABLE Dim_Reseller(
+  DimResellerID INTEGER IDENTITY(1,1) CONSTRAINT PK_DimReseller PRIMARY KEY NOT NULL, -- SurrogateKey     
+  DimLocationID INTEGER CONSTRAINT FK_DimLocationIDReseller FOREIGN KEY REFERENCES Dim_Location (DimLocationID) NOT NULL,
+  SourceResellerID Varchar(255) NOT NULL,
+  ResellerName Varchar (255) NOT NULL,
+  ContactName Varchar (255) NOT NULL,
+  PhoneNumber Varchar (255) NOT NULL,
+  Email Varchar (255) NOT NULL
+  );
+
+-- Handling NULL values 
+INSERT INTO Dim_Reseller (DimLocationID, SourceResellerID, ResellerName, ContactName, PhoneNumber, Email)
+VALUES (-1, 'Unknown','Unknown','Unknown', 'Unknown', 'Unknown');
+
+-- Inserting values into Dim_Reseller
+INSERT INTO Dim_Reseller (DimLocationID, SourceResellerID, ResellerName, ContactName, PhoneNumber, Email)
+SELECT distinct  DimLocationID, ResellerID, ResellerName, Contact, PhoneNumber, EmailAddress
+FROM Stage_Reseller
+JOIN Dim_Location Where Stage_Reseller.Address = Dim_Location.Address
+
+SELECT* FROM Dim_Reseller
+
+-- DROP Table Dim_Reseller
+-- SELECT* FROM Stage_Reseller -- 4 ROWS
+____________________________________________________________________________________________________________________________________
+
+--5. CREATING DIMENSIONAL TABLE "DIM_CHANNEL"
+
+ CREATE TABLE Dim_Channel(
+  DimChannelID INTEGER IDENTITY(1,1) CONSTRAINT PK_DimChannelID PRIMARY KEY NOT NULL,
+  SourceChannelID INT,
+  SourceChannelCategoryID INT,
+  ChannelName Varchar(255),
+  ChannelCategory Varchar(255)
+  ); 
+  
+INSERT INTO Dim_Channel (SourceChannelID,SourceChannelCategoryID , ChannelName, ChannelCategory)
+VALUES (-1, -1, 'Unknown','Unknown');
+
+INSERT INTO Dim_Channel (SourceChannelID, SourceChannelCategoryID, ChannelName, ChannelCategory)
+SELECT distinct  ChannelID, Stage_Channel.ChannelCategoryID, Channel, ChannelCategory AS ChannelCategory
+FROM Stage_Channel
+JOIN Stage_ChannelCategory Where Stage_Channel.ChannelCategoryID = Stage_ChannelCategory.ChannelCategoryID
+
+--JOIN Dim_Location WHERE Stage_Store.Address = Dim_Location.Address 
+
+SELECT* FROM Dim_Channel
+
+-- DROP Table Dim_Channel -- 6 ROWS
+-- SELECT* FROM Stage_Channel -- 5 ROWS
+-- SELECT* FROM Stage_ChannelCategory
+
+select ChannelCategoryID from Stage_Channel
+
+__________________________________________________________________________________________________________________________________
+-- 6. CREATING DIMENSIONAL TABLE "DIM_PRODUCT"
+
+Create  table  Dim_Product(
+  DimProductID INT IDENTITY(1,1) CONSTRAINT PK_DimProductID PRIMARY KEY NOT Null,
+  ProductID INT,
+  ProducttypeID INT,
+  ProductCategoryID INT,
+  ProductName Varchar(255),
+  Producttype Varchar(255),
+  ProductCategory Varchar(255),
+  ProductRetailPrice FLOAT,
+  ProductWholesalePrice FLOAT,
+  ProductCost FLOAT,
+  ProductRetailProfit FLOAT,
+  ProductWholeSaleUnitProfit FLOAT,
+  ProductProfitMarginUnitPercent FLOAT
+  );
+  
+-- Handling NULL values 
+INSERT INTO Dim_Product (ProductID, ProducttypeID, ProductCategoryID, ProductName, Producttype, ProductCategory, ProductRetailPrice, ProductWholesalePrice, ProductCost, ProductRetailProfit, ProductWholeSaleUnitProfit, ProductProfitMarginUnitpercent)
+VALUES (-1, -1, -1, 'Unknown','Unknown','Unknown', -1, -1, -1, -1, -1, -1);
+
+-- Inserting values into Dim_Product
+INSERT INTO Dim_Product (ProductID, ProducttypeID, ProductCategoryID, ProductName, Producttype, ProductCategory, ProductRetailPrice, ProductWholesalePrice, ProductCost, ProductRetailProfit, ProductWholeSaleUnitProfit, ProductProfitMarginUnitPercent)
+SELECT distinct ProductID, Stage_Product.ProducttypeID,Stage_ProductCategory.ProductCategoryID, Product, Producttype, ProductCategory, Price, WholesalePrice, Cost, Price - Cost AS ProductRetailProfit, Wholesaleprice - Cost AS ProductWholeSaleUnitProfit, (((Price-Cost)/Price)*100) AS ProductProfitMarginUnitPercent
+FROM Stage_Product
+JOIN Stage_ProductType on Stage_Product.ProducttypeID = Stage_ProductType.ProducttypeID
+JOIN Stage_ProductCategory on  Stage_ProductType.ProductCategoryID = Stage_ProductCategory.ProductCategoryID
+
+
+SELECT* FROM Dim_Product
+
+-- DROP Table Dim_Product
+
+____________________________________________________________________________________________________________________________________
+
+-- 7. CREATING DIMENSIONAL TABLE "DIM_DATE"
+create or replace table DIM_DATE (
+	DATE_PKEY				number(9) PRIMARY KEY,
+	DATE					date not null,
+	FULL_DATE_DESC			varchar(64) not null,
+	DAY_NUM_IN_WEEK			number(1) not null,
+	DAY_NUM_IN_MONTH		number(2) not null,
+	DAY_NUM_IN_YEAR			number(3) not null,
+	DAY_NAME				varchar(10) not null,
+	DAY_ABBREV				varchar(3) not null,
+	WEEKDAY_IND				varchar(64) not null,
+	US_HOLIDAY_IND			varchar(64) not null,
+	/*<COMPANYNAME>*/_HOLIDAY_IND varchar(64) not null,
+	MONTH_END_IND			varchar(64) not null,
+	WEEK_BEGIN_DATE_NKEY		number(9) not null,
+	WEEK_BEGIN_DATE			date not null,
+	WEEK_END_DATE_NKEY		number(9) not null,
+	WEEK_END_DATE			date not null,
+	WEEK_NUM_IN_YEAR		number(9) not null,
+	MONTH_NAME				varchar(10) not null,
+	MONTH_ABBREV			varchar(3) not null,
+	MONTH_NUM_IN_YEAR		number(2) not null,
+	YEARMONTH				varchar(10) not null,
+	QUARTER					number(1) not null,
+	YEARQUARTER				varchar(10) not null,
+	YEAR					number(5) not null,
+	FISCAL_WEEK_NUM			number(2) not null,
+	FISCAL_MONTH_NUM		number(2) not null,
+	FISCAL_YEARMONTH		varchar(10) not null,
+	FISCAL_QUARTER			number(1) not null,
+	FISCAL_YEARQUARTER		varchar(10) not null,
+	FISCAL_HALFYEAR			number(1) not null,
+	FISCAL_YEAR				number(5) not null,
+	SQL_TIMESTAMP			timestamp_ntz,
+	CURRENT_ROW_IND			char(1) default 'Y',
+	EFFECTIVE_DATE			date default to_date(current_timestamp),
+	EXPIRATION_DATE			date default To_date('9999-12-31') 
+)
+comment = 'Type 0 Dimension Table Housing Calendar and Fiscal Year Date Attributes'; 
+
+-- Inserting values into Dim_date
+insert into DIM_DATE
+select DATE_PKEY,
+		DATE_COLUMN,
+        FULL_DATE_DESC,
+		DAY_NUM_IN_WEEK,
+		DAY_NUM_IN_MONTH,
+		DAY_NUM_IN_YEAR,
+		DAY_NAME,
+		DAY_ABBREV,
+		WEEKDAY_IND,
+		US_HOLIDAY_IND,
+        COMPANY_HOLIDAY_IND,
+		MONTH_END_IND,
+		WEEK_BEGIN_DATE_NKEY,
+		WEEK_BEGIN_DATE,
+		WEEK_END_DATE_NKEY,
+		WEEK_END_DATE,
+		WEEK_NUM_IN_YEAR,
+		MONTH_NAME,
+		MONTH_ABBREV,
+		MONTH_NUM_IN_YEAR,
+		YEARMONTH,
+		CURRENT_QUARTER,
+		YEARQUARTER,
+		CURRENT_YEAR,
+		FISCAL_WEEK_NUM,
+		FISCAL_MONTH_NUM,
+		FISCAL_YEARMONTH,
+		FISCAL_QUARTER,
+		FISCAL_YEARQUARTER,
+		FISCAL_HALFYEAR,
+		FISCAL_YEAR,
+		SQL_TIMESTAMP,
+		CURRENT_ROW_IND,
+		EFFECTIVE_DATE,
+		EXPIRA_DATE
+	from 
+	    
+        
+    --( select to_date('01-25-2019 23:25:11.120','MM-DD-YYYY HH24:MI:SS.FF') as DD, /*<<Modify date for preferred table start date*/    
+    --( select to_date('2013-01-01 00:00:01','YYYY-MM-DD HH24:MI:SS') as DD, /*<<Modify date for preferred table start date*/
+	  ( select to_date('2012-12-31 23:59:59','YYYY-MM-DD HH24:MI:SS') as DD, /*<<Modify date for preferred table start date*/
+			seq1() as Sl,row_number() over (order by Sl) as row_numbers,
+			dateadd(day,row_numbers,DD) as V_DATE,
+			case when date_part(dd, V_DATE) < 10 and date_part(mm, V_DATE) > 9 then
+				date_part(year, V_DATE)||date_part(mm, V_DATE)||'0'||date_part(dd, V_DATE)
+				 when date_part(dd, V_DATE) < 10 and  date_part(mm, V_DATE) < 10 then 
+				 date_part(year, V_DATE)||'0'||date_part(mm, V_DATE)||'0'||date_part(dd, V_DATE)
+				 when date_part(dd, V_DATE) > 9 and  date_part(mm, V_DATE) < 10 then
+				 date_part(year, V_DATE)||'0'||date_part(mm, V_DATE)||date_part(dd, V_DATE)
+				 when date_part(dd, V_DATE) > 9 and  date_part(mm, V_DATE) > 9 then
+				 date_part(year, V_DATE)||date_part(mm, V_DATE)||date_part(dd, V_DATE) end as DATE_PKEY,
+			V_DATE as DATE_COLUMN,
+			dayname(dateadd(day,row_numbers,DD)) as DAY_NAME_1,
+			case 
+				when dayname(dateadd(day,row_numbers,DD)) = 'Mon' then 'Monday'
+				when dayname(dateadd(day,row_numbers,DD)) = 'Tue' then 'Tuesday'
+				when dayname(dateadd(day,row_numbers,DD)) = 'Wed' then 'Wednesday'
+				when dayname(dateadd(day,row_numbers,DD)) = 'Thu' then 'Thursday'
+				when dayname(dateadd(day,row_numbers,DD)) = 'Fri' then 'Friday'
+				when dayname(dateadd(day,row_numbers,DD)) = 'Sat' then 'Saturday'
+				when dayname(dateadd(day,row_numbers,DD)) = 'Sun' then 'Sunday' end ||', '||
+			case when monthname(dateadd(day,row_numbers,DD)) ='Jan' then 'January'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Feb' then 'February'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Mar' then 'March'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Apr' then 'April'
+				   when monthname(dateadd(day,row_numbers,DD)) ='May' then 'May'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Jun' then 'June'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Jul' then 'July'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Aug' then 'August'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Sep' then 'September'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Oct' then 'October'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Nov' then 'November'
+				   when monthname(dateadd(day,row_numbers,DD)) ='Dec' then 'December' end
+				   ||' '|| to_varchar(dateadd(day,row_numbers,DD), ' dd, yyyy') as FULL_DATE_DESC,
+			dateadd(day,row_numbers,DD) as V_DATE_1,
+			dayofweek(V_DATE_1)+1 as DAY_NUM_IN_WEEK,
+			Date_part(dd,V_DATE_1) as DAY_NUM_IN_MONTH,
+			dayofyear(V_DATE_1) as DAY_NUM_IN_YEAR,
+			case 
+				when dayname(V_DATE_1) = 'Mon' then 'Monday'
+				when dayname(V_DATE_1) = 'Tue' then 'Tuesday'
+				when dayname(V_DATE_1) = 'Wed' then 'Wednesday'
+				when dayname(V_DATE_1) = 'Thu' then 'Thursday'
+				when dayname(V_DATE_1) = 'Fri' then 'Friday'
+				when dayname(V_DATE_1) = 'Sat' then 'Saturday'
+				when dayname(V_DATE_1) = 'Sun' then 'Sunday' end as	DAY_NAME,
+			dayname(dateadd(day,row_numbers,DD)) as DAY_ABBREV,
+			case  
+				when dayname(V_DATE_1) = 'Sun' and dayname(V_DATE_1) = 'Sat' then 
+                 'Not-Weekday'
+				else 'Weekday' end as WEEKDAY_IND,
+			 case 
+				when (DATE_PKEY = date_part(year, V_DATE)||'0101' or DATE_PKEY = date_part(year, V_DATE)||'0704' or
+				DATE_PKEY = date_part(year, V_DATE)||'1225' or DATE_PKEY = date_part(year, V_DATE)||'1226') then  
+				'Holiday' 
+				when monthname(V_DATE_1) ='May' and dayname(last_day(V_DATE_1)) = 'Wed' 
+				and dateadd(day,-2,last_day(V_DATE_1)) = V_DATE_1  then
+				'Holiday'
+				when monthname(V_DATE_1) ='May' and dayname(last_day(V_DATE_1)) = 'Thu' 
+				and dateadd(day,-3,last_day(V_DATE_1)) = V_DATE_1  then
+				'Holiday'
+				when monthname(V_DATE_1) ='May' and dayname(last_day(V_DATE_1)) = 'Fri' 
+				and dateadd(day,-4,last_day(V_DATE_1)) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='May' and dayname(last_day(V_DATE_1)) = 'Sat' 
+				and dateadd(day,-5,last_day(V_DATE_1)) = V_DATE_1  then
+				'Holiday'
+				when monthname(V_DATE_1) ='May' and dayname(last_day(V_DATE_1)) = 'Sun' 
+				and dateadd(day,-6,last_day(V_DATE_1)) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='May' and dayname(last_day(V_DATE_1)) = 'Mon' 
+				and last_day(V_DATE_1) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='May' and dayname(last_day(V_DATE_1)) = 'Tue' 
+				and dateadd(day,-1 ,last_day(V_DATE_1)) = V_DATE_1  then
+				'Holiday'
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Wed' 
+				and dateadd(day,5,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Thu' 
+				and dateadd(day,4,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Fri' 
+				and dateadd(day,3,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Sat' 
+				and dateadd(day,2,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Sun' 
+				and dateadd(day,1,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Mon' 
+				and date_part(year, V_DATE_1)||'-09-01' = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Tue' 
+				and dateadd(day,6 ,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Wed' 
+				and (dateadd(day,23,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1  or 
+					 dateadd(day,22,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 ) then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Thu' 
+				and ( dateadd(day,22,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 or 
+					 dateadd(day,21,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 ) then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Fri' 
+				and ( dateadd(day,21,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 or 
+					 dateadd(day,20,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 ) then
+				 'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Sat' 
+				and ( dateadd(day,27,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 or 
+					 dateadd(day,26,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 ) then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Sun' 
+				and ( dateadd(day,26,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 or 
+					 dateadd(day,25,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 ) then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Mon' 
+				and (dateadd(day,25,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 or 
+					 dateadd(day,24,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 ) then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Tue' 
+				and (dateadd(day,24,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 or 
+					 dateadd(day,23,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 ) then
+				 'Holiday'    
+				else
+				'Not-Holiday' end as US_HOLIDAY_IND,
+			/*Modify the following for Company Specific Holidays*/
+			case 
+				when (DATE_PKEY = date_part(year, V_DATE)||'0101' or DATE_PKEY = date_part(year, V_DATE)||'0219'
+				or DATE_PKEY = date_part(year, V_DATE)||'0528' or DATE_PKEY = date_part(year, V_DATE)||'0704' 
+				or DATE_PKEY = date_part(year, V_DATE)||'1225' )then 
+				'Holiday'               
+                when monthname(V_DATE_1) ='Mar' and dayname(last_day(V_DATE_1)) = 'Fri' 
+				and last_day(V_DATE_1) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Mar' and dayname(last_day(V_DATE_1)) = 'Sat' 
+				and dateadd(day,-1,last_day(V_DATE_1)) = V_DATE_1  then
+				'Holiday'
+				when monthname(V_DATE_1) ='Mar' and dayname(last_day(V_DATE_1)) = 'Sun' 
+				and dateadd(day,-2,last_day(V_DATE_1)) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Tue'
+                and dateadd(day,3,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Wed' 
+				and dateadd(day,2,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Thu'
+                and dateadd(day,1,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Fri' 
+				and date_part(year, V_DATE_1)||'-04-01' = V_DATE_1 then
+				'Holiday'
+                when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Wed' 
+				and dateadd(day,5,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Thu' 
+				and dateadd(day,4,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Fri' 
+				and dateadd(day,3,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Sat' 
+				and dateadd(day,2,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Sun' 
+				and dateadd(day,1,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Mon' 
+                and date_part(year, V_DATE_1)||'-04-01'= V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Apr' and dayname(date_part(year, V_DATE_1)||'-04-01') = 'Tue' 
+				and dateadd(day,6 ,(date_part(year, V_DATE_1)||'-04-01')) = V_DATE_1  then
+				'Holiday'   
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Wed' 
+				and dateadd(day,5,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Thu' 
+				and dateadd(day,4,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Fri' 
+				and dateadd(day,3,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Sat' 
+				and dateadd(day,2,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Sun' 
+				and dateadd(day,1,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Mon' 
+                and date_part(year, V_DATE_1)||'-09-01' = V_DATE_1 then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Sep' and dayname(date_part(year, V_DATE_1)||'-09-01') = 'Tue' 
+				and dateadd(day,6 ,(date_part(year, V_DATE_1)||'-09-01')) = V_DATE_1  then
+				'Holiday' 
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Wed' 
+				and dateadd(day,23,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Thu' 
+				and dateadd(day,22,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Fri' 
+				and dateadd(day,21,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1  then
+				 'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Sat' 
+				and dateadd(day,27,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Sun' 
+				and dateadd(day,26,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Mon' 
+				and dateadd(day,25,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1 then
+				'Holiday'
+				when monthname(V_DATE_1) ='Nov' and dayname(date_part(year, V_DATE_1)||'-11-01') = 'Tue' 
+				and dateadd(day,24,(date_part(year, V_DATE_1)||'-11-01')) = V_DATE_1  then
+				 'Holiday'     
+				else
+				'Not-Holiday' end as COMPANY_HOLIDAY_IND,
+			case                                           
+				when last_day(V_DATE_1) = V_DATE_1 then 
+				'Month-end'
+				else 'Not-Month-end' end as MONTH_END_IND,
+					
+			case when date_part(mm,date_trunc('week',V_DATE_1)) < 10 and date_part(dd,date_trunc('week',V_DATE_1)) < 10 then
+					  date_part(yyyy,date_trunc('week',V_DATE_1))||'0'||
+					  date_part(mm,date_trunc('week',V_DATE_1))||'0'||
+					  date_part(dd,date_trunc('week',V_DATE_1))  
+				 when date_part(mm,date_trunc('week',V_DATE_1)) < 10 and date_part(dd,date_trunc('week',V_DATE_1)) > 9 then
+						date_part(yyyy,date_trunc('week',V_DATE_1))||'0'||
+						date_part(mm,date_trunc('week',V_DATE_1))||date_part(dd,date_trunc('week',V_DATE_1))    
+				 when date_part(mm,date_trunc('week',V_DATE_1)) > 9 and date_part(dd,date_trunc('week',V_DATE_1)) < 10 then
+						date_part(yyyy,date_trunc('week',V_DATE_1))||date_part(mm,date_trunc('week',V_DATE_1))||
+						'0'||date_part(dd,date_trunc('week',V_DATE_1))    
+				when date_part(mm,date_trunc('week',V_DATE_1)) > 9 and date_part(dd,date_trunc('week',V_DATE_1)) > 9 then
+						date_part(yyyy,date_trunc('week',V_DATE_1))||
+						date_part(mm,date_trunc('week',V_DATE_1))||
+						date_part(dd,date_trunc('week',V_DATE_1)) end as WEEK_BEGIN_DATE_NKEY,
+			date_trunc('week',V_DATE_1) as WEEK_BEGIN_DATE,
+
+			case when  date_part(mm,last_day(V_DATE_1,'week')) < 10 and date_part(dd,last_day(V_DATE_1,'week')) < 10 then
+					  date_part(yyyy,last_day(V_DATE_1,'week'))||'0'||
+					  date_part(mm,last_day(V_DATE_1,'week'))||'0'||
+					  date_part(dd,last_day(V_DATE_1,'week')) 
+				 when  date_part(mm,last_day(V_DATE_1,'week')) < 10 and date_part(dd,last_day(V_DATE_1,'week')) > 9 then
+					  date_part(yyyy,last_day(V_DATE_1,'week'))||'0'||
+					  date_part(mm,last_day(V_DATE_1,'week'))||date_part(dd,last_day(V_DATE_1,'week'))   
+				 when  date_part(mm,last_day(V_DATE_1,'week')) > 9 and date_part(dd,last_day(V_DATE_1,'week')) < 10  then
+					  date_part(yyyy,last_day(V_DATE_1,'week'))||date_part(mm,last_day(V_DATE_1,'week'))||'0'||
+					  date_part(dd,last_day(V_DATE_1,'week'))   
+				 when  date_part(mm,last_day(V_DATE_1,'week')) > 9 and date_part(dd,last_day(V_DATE_1,'week')) > 9 then
+					  date_part(yyyy,last_day(V_DATE_1,'week'))||
+					  date_part(mm,last_day(V_DATE_1,'week'))||
+					  date_part(dd,last_day(V_DATE_1,'week')) end as WEEK_END_DATE_NKEY,
+			last_day(V_DATE_1,'week') as WEEK_END_DATE,
+			week(V_DATE_1) as WEEK_NUM_IN_YEAR,
+			case when monthname(V_DATE_1) ='Jan' then 'January'
+				   when monthname(V_DATE_1) ='Feb' then 'February'
+				   when monthname(V_DATE_1) ='Mar' then 'March'
+				   when monthname(V_DATE_1) ='Apr' then 'April'
+				   when monthname(V_DATE_1) ='May' then 'May'
+				   when monthname(V_DATE_1) ='Jun' then 'June'
+				   when monthname(V_DATE_1) ='Jul' then 'July'
+				   when monthname(V_DATE_1) ='Aug' then 'August'
+				   when monthname(V_DATE_1) ='Sep' then 'September'
+				   when monthname(V_DATE_1) ='Oct' then 'October'
+				   when monthname(V_DATE_1) ='Nov' then 'November'
+				   when monthname(V_DATE_1) ='Dec' then 'December' end as MONTH_NAME,
+			monthname(V_DATE_1) as MONTH_ABBREV,
+			month(V_DATE_1) as MONTH_NUM_IN_YEAR,
+			case when month(V_DATE_1) < 10 then 
+			year(V_DATE_1)||'-0'||month(V_DATE_1)   
+			else year(V_DATE_1)||'-'||month(V_DATE_1) end as YEARMONTH,
+			quarter(V_DATE_1) as CURRENT_QUARTER,
+			year(V_DATE_1)||'-0'||quarter(V_DATE_1) as YEARQUARTER,
+			year(V_DATE_1) as CURRENT_YEAR,
+			/*Modify the following based on company fiscal year - assumes Jan 01*/
+            to_date(year(V_DATE_1)||'-01-01','YYYY-MM-DD') as FISCAL_CUR_YEAR,
+            to_date(year(V_DATE_1) -1||'-01-01','YYYY-MM-DD') as FISCAL_PREV_YEAR,
+			case when   V_DATE_1 < FISCAL_CUR_YEAR then
+			datediff('week', FISCAL_PREV_YEAR,V_DATE_1)
+			else 
+			datediff('week', FISCAL_CUR_YEAR,V_DATE_1)  end as FISCAL_WEEK_NUM  ,
+			decode(datediff('MONTH',FISCAL_CUR_YEAR, V_DATE_1)+1 ,-2,10,-1,11,0,12,
+                   datediff('MONTH',FISCAL_CUR_YEAR, V_DATE_1)+1 ) as FISCAL_MONTH_NUM,
+			concat( year(FISCAL_CUR_YEAR) 
+				   ,case when to_number(FISCAL_MONTH_NUM) = 10 or 
+							to_number(FISCAL_MONTH_NUM) = 11 or 
+                            to_number(FISCAL_MONTH_NUM) = 12  then
+							'-'||FISCAL_MONTH_NUM
+					else  concat('-0',FISCAL_MONTH_NUM) end ) as FISCAL_YEARMONTH,
+			case when quarter(V_DATE_1) = 4 then 4
+				 when quarter(V_DATE_1) = 3 then 3
+				 when quarter(V_DATE_1) = 2 then 2
+				 when quarter(V_DATE_1) = 1 then 1 end as FISCAL_QUARTER,
+			
+			case when   V_DATE_1 < FISCAL_CUR_YEAR then
+					year(FISCAL_CUR_YEAR)
+					else year(FISCAL_CUR_YEAR)+1 end
+					||'-0'||case when quarter(V_DATE_1) = 4 then 4
+					 when quarter(V_DATE_1) = 3 then 3
+					 when quarter(V_DATE_1) = 2 then 2
+					 when quarter(V_DATE_1) = 1 then 1 end as FISCAL_YEARQUARTER,
+			case when quarter(V_DATE_1) = 4  then 2 when quarter(V_DATE_1) = 3 then 2
+				when quarter(V_DATE_1) = 1  then 1 when quarter(V_DATE_1) = 2 then 1
+			end as FISCAL_HALFYEAR,
+			year(FISCAL_CUR_YEAR) as FISCAL_YEAR,
+			to_timestamp_ntz(V_DATE) as SQL_TIMESTAMP,
+			'Y' as CURRENT_ROW_IND,
+			to_date(current_timestamp) as EFFECTIVE_DATE,
+			to_date('9999-12-31') as EXPIRA_DATE
+			--from table(generator(rowcount => 8401)) /*<< Set to generate 20 years. Modify rowcount to increase or decrease size*/
+	        from table(generator(rowcount => 730)) /*<< Set to generate 20 years. Modify rowcount to increase or decrease size*/
+    )v;
+    
+    Select* from Dim_Date
+    
+_____________________________________________________________________________________________________________________________________________________________________________________________
+
+
+-------FACT TABLES-------
+
+-- 1. Create Table : Fact_ProductSalesTarget
+
+CREATE TABLE Fact_ProductSalesTarget
+(
+  DimProductID INTEGER CONSTRAINT FK_DimProductID FOREIGN KEY REFERENCES Dim_Product(DimProductID), --Foreign Key
+  DimTargetDateID NUMBER(9) CONSTRAINT FK_DimTargetDateID FOREIGN KEY REFERENCES Dim_Date(Date_Pkey), --Foreign Key
+  ProductTargetSaleQuantity INTEGER NOT NULL
+);
+
+INSERT INTO Fact_ProductSalesTarget 
+    (DimProductID, 
+     DimTargetDateID, 
+     ProductTargetSaleQuantity)
+SELECT Distinct 
+    DimProductID, 
+    Dim_Date.Date_Pkey AS DimTargetDateID, 
+    Round(Stage_TargetDataProduct.SalesQuantityTarget/ 365, 2)  AS ProductTargetSaleQuantity
+FROM Stage_TargetDataProduct
+INNER JOIN Dim_Product ON  
+    Stage_TargetDataProduct.ProductID = Dim_Product.ProductID 
+INNER JOIN Dim_Date ON 
+   Stage_TargetDataProduct.YEAR = Dim_Date.YEAR
+
+
+-- SELECT * FROM Fact_ProductSalesTarget 
+-- DROP TABLE Fact_ProductSalesTarget  
+_____________________________________________________________________________________________________________________________________________________________________________________________
+
+
+-- 2. Create Table : Fact_SRCSalesTarget
+
+CREATE TABLE Fact_SRCSalesTarget
+(
+  DimStoreID INTEGER CONSTRAINT FK_DimStoreID FOREIGN KEY REFERENCES Dim_Store(DimStoreID), --Foreign Key
+  DimResellerID INTEGER CONSTRAINT FK_DimSResellerID FOREIGN KEY REFERENCES Dim_Reseller(DimResellerID), --Foreign Key 
+  DimChannelID INTEGER CONSTRAINT FK_DimustomerID FOREIGN KEY REFERENCES Dim_Customer(DimCustomerID), --Foreign Key
+  DimTargetDateID NUMBER(9) CONSTRAINT FK_DimTargetDateID FOREIGN KEY REFERENCES Dim_Date(Date_Pkey), --Foreign Key
+  SalesTargetAmount FLOAT NOT NULL
+  );
+
+INSERT INTO Fact_SRCSalesTarget 
+(DimStoreID , 
+ DimResellerID , 
+ DimChannelID, 
+ DimTargetDateID, 
+ SalesTargetAmount )
+select DISTINCT 
+    CASE
+      WHEN TargetName = 'Store Number 5' then 5
+      WHEN TargetName = 'Store Number 8' then 8
+      WHEN TargetName = 'Store Number 10' then 10
+      WHEN Targetname = 'Store Number 21' then 21
+      WHEN TargetName = 'Store Number 34' then 34
+      WHEN TargetName = 'Store Number 39' then 39
+      else -1
+      END as DimStoreID , 
+    NVL(DimResellerID, -1) , 
+    SourceChannelID AS DimChannelID,
+    Dim_Date.Date_Pkey AS DimTargetDateID, 
+    Round(Stage_Target_SRC.TARGETSALESAMOUNT/365, 2) AS SalesTargetAmount
+FROM Stage_Target_SRC 
+Inner JOIN Dim_Channel 
+ON dim_Channel.ChannelName = CASE WHEN Stage_Target_SRC.ChannelName = 'Online' THEN 'On-line' ELSE Stage_Target_SRC.ChannelName END
+   --Dim_Channel.ChannelName = Stage_Target_SRC.ChannelName 
+LEFT JOIN Dim_Reseller ON 
+   Stage_Target_SRC.TargetName = Dim_Reseller.ResellerName
+LEFT JOIN Dim_Date ON 
+   Stage_Target_SRC.YEAR = Dim_Date.YEAR
+ 
+-- SELECT * from Fact_SRCSalesTarget
+-- DROP TABLE Fact_SRCSalesTarget
+
+_____________________________________________________________________________________________________________________________________________________________________________________________
+
+-- 3. Create Table : Fact_SalesActual
+
+CREATE TABLE Fact_SalesActual
+(
+  DimProductID INTEGER CONSTRAINT FK_DimProductID FOREIGN KEY REFERENCES Dim_Product(DimProductID), --Foreign Key
+  DimStoreID INTEGER CONSTRAINT FK_DimStoreID FOREIGN KEY REFERENCES Dim_Store(DimStoreID), --Foreign Key
+  DimResellerID INTEGER CONSTRAINT FK_DimSResellerID FOREIGN KEY REFERENCES Dim_Reseller(DimResellerID), --Foreign Key 
+  DimCustomerID INTEGER CONSTRAINT FK_DimustomerID FOREIGN KEY REFERENCES Dim_Customer(DimCustomerID), --Foreign Key
+  DimChannelID INTEGER CONSTRAINT FK_DimChannelID FOREIGN KEY REFERENCES Dim_Channel(DimChannelID),--Foreign Key
+  DimSaleDateID Number (9) CONSTRAINT FK_DimSaleDateID FOREIGN KEY REFERENCES Dim_Date(Date_Pkey), --Foreign Key
+  DimLocationID INTEGER CONSTRAINT FK_DimLocationID FOREIGN KEY REFERENCES Dim_Location(DimLocationID), --Foreign Key
+  SalesHeaderID INTEGER NOT NULL,
+  SalesDetailID INTEGER NOT NULL,
+  SalesAmount FLOAT NOT NULL,
+  SalesQuantity INTEGER NOT NULL,
+  SaleUnitPrice FLOAT NOT NULL,
+  SaleExtendedCost FLOAT NOT NULL,
+  SaleTotalProfit FLOAT NOT NULL
+);
+
+INSERT INTO Fact_SalesActual  
+  (DimProductID
+   ,DimStoreID
+   ,DimResellerID
+   ,DimCustomerID 
+   ,DimChannelID
+   ,DimSaleDateID 
+   ,DimLocationID
+   ,SalesHeaderID  
+   ,SalesDetailID
+   ,SalesAmount
+   ,SalesQuantity
+   ,SaleUnitPrice
+   ,SaleExtendedCost
+   ,SaleTotalProfit
+    )
+SELECT 
+     Dim_Product.DimProductID 
+    ,NVL(Dim_Store.DimStoreID, -1)
+    ,NVL(Dim_Reseller.DimResellerID, -1) 
+    ,NVL(Dim_Customer.DimCustomerID , -1)
+    ,Dim_Channel.DimChannelID  
+    ,CAST(REPLACE(REPLACE(CAST(Stage_SalesHeader_Updated.DATE AS DATE), '00', '20'), '-', '') AS NUMBER(9)) AS DimSaleDateID 
+    ,NVL(Dim_Location.DimLocationID, -1)
+    ,Stage_SalesHeader_Updated.SalesHeaderID 
+    ,Stage_SalesDetail.SALEDDETAILID
+    ,SalesAmount
+    ,SalesQuantity
+    ,(SalesAmount/SalesQuantity) AS Sales_Unit_Price
+    ,CASE when (SalesAmount / SalesQuantity) = Dim_Product.ProductRetailPrice then Dim_Product.ProductRetailPrice else Dim_Product.ProductWholesalePrice end AS Extended_Cost
+    ,Sales_Unit_Price - Dim_Product.ProductCost AS SaleTotalProfit     
+FROM Stage_SalesDetail
+INNER JOIN Stage_SalesHeader_Updated ON 
+    Stage_SalesDetail.SalesHeaderID =  Stage_SalesHeader_Updated.SalesHeaderID 
+INNER JOIN Dim_Product ON 
+    Dim_Product.ProductID = Stage_SalesDetail.ProductID
+INNER JOIN Dim_Channel ON
+    Dim_Channel.SourceChannelID = Stage_SalesHeader_Updated.ChannelID
+LEFT JOIN Dim_Store ON
+    Dim_Store.StoreID = Stage_SalesHeader_Updated.StoreID
+LEFT JOIN Dim_Location ON
+    Dim_Store.DimLocationID = Dim_Location.DimLocationID
+LEFT JOIN Dim_Customer ON
+    Stage_SalesHeader_Updated.CustomerID = Dim_Customer.SourceCustomerID 
+LEFT JOIN Dim_Reseller ON
+    Dim_Reseller.SourceResellerID = Stage_SalesHeader_Updated.ResellerID;
+    
+    
+-- SELECT * FROM Fact_SalesActual
+
+-- DROP TABLE Fact_SalesActual
+
+__________________________________________________________________________________________________________________________________________________________
+
+
+-------VIEWS-------
+
+
+CREATE VIEW View_DIM_LOCATION AS
+(
+SELECT DIMLOCATIONID, ADDRESS, CITY, COUNTRY, POSTALCODE
+FROM DIM_LOCATION 
+);
+
+CREATE VIEW View__DIM_CUSTOMER AS
+(
+SELECT DIMCUSTOMERID, DIMLOCATIONID, SOURCECUSTOMERID, FULLNAME, FIRSTNAME, LASTNAME, GENDER, EMAILADDRESS, PHONENUMBER
+FROM DIM_CUSTOMER  
+);
+
+CREATE VIEW View_DIM_STORE AS
+(
+SELECT DIMSTOREID,DIMLOCATIONID, STOREID, STORENUMBER, STOREMANAGER
+FROM DIM_STORE
+);
+
+CREATE VIEW View_DIM_RESELLER AS
+(
+SELECT DIMRESELLERID, DIMLOCATIONID, SOURCERESELLERID, RESELLERNAME, CONTACTNAME, PHONENUMBER, EMAIL
+FROM DIM_RESELLER
+);
+
+CREATE VIEW View_DIM_CHANNEL AS
+(
+SELECT DIMCHANNELID, SOURCECHANNELID, SOURCECHANNELCATEGORYID, CHANNELNAME, CHANNELCATEGORY
+FROM DIM_CHANNEL
+);
+
+CREATE VIEW View_DIM_PRODUCT AS
+(
+SELECT DIMPRODUCTID, PRODUCTID, PRODUCTTYPEID, PRODUCTCATEGORYID, PRODUCTNAME, PRODUCTTYPE, PRODUCTCATEGORY,
+  PRODUCTRETAILPRICE, PRODUCTWHOLESALEPRICE, PRODUCTCOST, PRODUCTRETAILPROFIT, PRODUCTWHOLESALEUNITPROFIT,
+  PRODUCTPROFITMARGINUNITPERCENT
+FROM DIM_PRODUCT
+);
+
+CREATE VIEW View_Fact_ProductSalesTarget AS
+(
+SELECT DIMPRODUCTID, DimTargetDateID, ProductTargetSaleQuantity
+FROM Fact_ProductSalesTarget
+);
+
+CREATE VIEW View_Fact_SRCSalesTarget AS
+(
+SELECT DIMSTOREID, DIMRESELLERID, DIMCHANNELID, DimTargetDateID, SalestargetAmount
+FROM Fact_SRCSalesTarget
+);
+
+CREATE VIEW View_Fact_SalesActual AS
+(
+SELECT SALESHEADERID,SALESDETAILID, DIMPRODUCTID, DIMSTOREID, DIMRESELLERID, DIMCUSTOMERID, DIMCHANNELID, DimSaleDateID, DIMLOCATIONID,
+  SALESAMOUNT, SALESQUANTITY, SALEUNITPRICE, SALEEXTENDEDCOST, SALETOTALPROFIT
+FROM Fact_SalesActual
+);
+__________________________________________________________________________________________________________________________________________________________
+
+
+-----------Views to answer business queries (Date Visualization)---------
+
+-- View 1
+
+CREATE OR REPLACE SECURE VIEW VIEW_Overall_sales
+AS
+SELECT DISTINCT c.DIMSTOREID,c.YEAR,c.SALESAMOUNT,c.SALESTARGETAMOUNT
+FROM (
+  SELECT DISTINCT a.DIMSTOREID, a.YEAR, b.SALESAMOUNT, a.SALESTARGETAMOUNT
+  FROM (
+    SELECT DIMSTOREID,  LEFT(CAST(DIMTARGETDATEID AS varchar(8)),4) as YEAR, SALESTARGETAMOUNT
+    FROM FACT_SRCSALESTARGET
+    WHERE DIMSTOREID <> -1
+  ) a
+INNER JOIN (
+  SELECT DIMSTOREID, SUM(SALESAMOUNT) as SALESAMOUNT, YEAR
+  FROM (
+      SELECT DIM_STORE.STORENUMBER AS DimStoreID, DIMSALEDATEID, SALESAMOUNT, LEFT(CAST(DIMSALEDATEID AS varchar(8)),4) as YEAR
+      FROM FACT_SALESACTUAL
+      Join Dim_Store ON Dim_Store.DimStoreID = Fact_SalesActual.DimStoreID
+    ) 
+    GROUP BY YEAR, DIMSTOREID
+  ) b
+ON a.DIMSTOREID= b.DIMSTOREID
+AND a.YEAR = b.YEAR
+) c 
+INNER JOIN DIM_STORE
+ON c.DIMSTOREID = DIM_STORE.STORENUMBER;
+
+-- DROP VIEW Overall_sales
+
+-- Test View 1
+SELECT * FROM VIEW_Overall_sales
+WHERE DimStoreID In(10,21)
+ORDER BY DimStoreID
+
+------------------------------------------------------------------------------------------------------------------ 
+
+-- View 2
+
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_vs_Target
+AS
+(
+SELECT YEAR, STORENUMBER, SUM(SalesTargetAmount) AS SalesTargetAmount, SUM(SalesAmount) AS SalesAmount, 
+ROUND((SUM(SalesAmount)/SUM(SalesTargetAmount))*100,2) AS TargetAchieved
+FROM 
+(
+SELECT c.Year, b.StoreNumber, SUM(a.SalesTargetAmount) AS SalesTargetAmount, 0 AS SalesAmount
+FROM Fact_SRCSalesTarget a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.StoreNumber
+Inner JOIN Dim_Date c
+  ON a.DimTargetDateID = c.Date_PKEY
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+
+UNION 
+
+SELECT c.Year, b.StoreNumber, 0 AS SalesTargetAmount, SUM(a.SalesAmount) AS SalesAmount
+FROM Fact_SalesActual a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.DimStoreID
+INNER JOIN Dim_Date c
+  ON a.DimSaleDateID = c.DATE_PKEY 
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+)
+GROUP BY YEAR, STORENUMBER
+ORDER BY YEAR
+);
+    
+--Select * From  VIEW_Sales_vs_Target
+--Drop View VIEW_Sales_vs_Target
+
+------------------------------------------------------------------------------------------------------------------
+
+-- View 3
+
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_by_Day
+AS
+SELECT a.DimStoreID, SUM(SalesAmount) as SalesAmount, c.Day_Name, c.Day_Num_In_Week AS Day_Number
+FROM Fact_SalesActual a 
+    Inner JOIN Dim_Store b
+        ON a.DimStoreID = b.DimStoreID
+    Inner JOIN Dim_Date c
+        ON a.DimSaleDateID = c.Date_PKEY
+        Where a.DimStoreID = 4 OR a.DimStoreID = 6
+    Group by Day_Name, Day_Number, a.DimStoreID
+    ORDER BY Day_Number, DimStoreID;
+    
+--Drop View VIEW_Sales_by_Day
+
+-- Test View 3
+
+SELECT * FROM VIEW_Sales_by_Day
+WHERE Day_Name = 'Friday' OR Day_Name = 'Saturday' OR Day_Name = 'Sunday'
+------------------------------------------------------------------------------------------------------------------
+
+
+
+/*
+Saakshi Bhayana
+Assignment 8
+
+Date: 05/22/2022*/
+
+/*
+CREATE VIEW view_name AS
+SELECT column1, column2, ...
+FROM table_name
+WHERE condition;
+*/
+
+USE IMT577_DW_SAAKSHI_BHAYANA
+
+-- View 1
+
+CREATE OR REPLACE SECURE VIEW VIEW_Overall_sales
+AS
+SELECT DISTINCT c.DIMSTOREID,c.YEAR,c.SALESAMOUNT,c.SALESTARGETAMOUNT
+FROM (
+  SELECT DISTINCT a.DIMSTOREID, a.YEAR, b.SALESAMOUNT, a.SALESTARGETAMOUNT
+  FROM (
+    SELECT DIMSTOREID,  LEFT(CAST(DIMTARGETDATEID AS varchar(8)),4) as YEAR, SALESTARGETAMOUNT
+    FROM FACT_SRCSALESTARGET
+    WHERE DIMSTOREID <> -1
+  ) a
+INNER JOIN (
+  SELECT DIMSTOREID, SUM(SALESAMOUNT) as SALESAMOUNT, YEAR
+  FROM (
+      SELECT DIM_STORE.STORENUMBER AS DimStoreID, DIMSALEDATEID, SALESAMOUNT, LEFT(CAST(DIMSALEDATEID AS varchar(8)),4) as YEAR
+      FROM FACT_SALESACTUAL
+      Join Dim_Store ON Dim_Store.DimStoreID = Fact_SalesActual.DimStoreID
+    ) 
+    GROUP BY YEAR, DIMSTOREID
+  ) b
+ON a.DIMSTOREID= b.DIMSTOREID
+AND a.YEAR = b.YEAR
+) c 
+INNER JOIN DIM_STORE
+ON c.DIMSTOREID = DIM_STORE.STORENUMBER;
+
+-- DROP VIEW Overall_sales
+
+-- Test View 1
+SELECT * FROM VIEW_Overall_sales
+WHERE DimStoreID In(10,21)
+ORDER BY DimStoreID
+
+------------------------------------------------------------------------------------------------------------------ 
+
+-- View 2
+
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_vs_Target
+AS
+(
+SELECT YEAR, STORENUMBER, SUM(SalesTargetAmount) AS SalesTargetAmount, SUM(SalesAmount) AS SalesAmount, 
+ROUND((SUM(SalesAmount)/SUM(SalesTargetAmount))*100,2) AS TargetAchieved
+FROM 
+(
+SELECT c.Year, b.StoreNumber, SUM(a.SalesTargetAmount) AS SalesTargetAmount, 0 AS SalesAmount
+FROM Fact_SRCSalesTarget a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.StoreNumber
+Inner JOIN Dim_Date c
+  ON a.DimTargetDateID = c.Date_PKEY
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+
+UNION 
+
+SELECT c.Year, b.StoreNumber, 0 AS SalesTargetAmount, SUM(a.SalesAmount) AS SalesAmount
+FROM Fact_SalesActual a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.DimStoreID
+INNER JOIN Dim_Date c
+  ON a.DimSaleDateID = c.DATE_PKEY 
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+)
+GROUP BY YEAR, STORENUMBER
+ORDER BY YEAR
+);
+    
+--Select * From  VIEW_Sales_vs_Target
+--Drop View VIEW_Sales_vs_Target
+
+------------------------------------------------------------------------------------------------------------------
+
+-- View 3
+
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_by_Day
+AS
+SELECT a.DimStoreID, SUM(SalesAmount) as SalesAmount, c.Day_Name, c.Day_Num_In_Week AS Day_Number
+FROM Fact_SalesActual a 
+    Inner JOIN Dim_Store b
+        ON a.DimStoreID = b.DimStoreID
+    Inner JOIN Dim_Date c
+        ON a.DimSaleDateID = c.Date_PKEY
+        Where a.DimStoreID = 4 OR a.DimStoreID = 6
+    Group by Day_Name, Day_Number, a.DimStoreID
+    ORDER BY Day_Number, DimStoreID;
+    
+--Drop View VIEW_Sales_by_Day
+
+-- Test View 3
+
+SELECT * FROM VIEW_Sales_by_Day
+WHERE Day_Name = 'Friday' OR Day_Name = 'Saturday' OR Day_Name = 'Sunday'
+------------------------------------------------------------------------------------------------------------------
+
+
+
+-- View 1
+
+CREATE OR REPLACE SECURE VIEW VIEW_Overall_sales
+AS
+SELECT DISTINCT c.DIMSTOREID,c.YEAR,c.SALESAMOUNT,c.SALESTARGETAMOUNT
+FROM (
+  SELECT DISTINCT a.DIMSTOREID, a.YEAR, b.SALESAMOUNT, a.SALESTARGETAMOUNT
+  FROM (
+    SELECT DIMSTOREID,  LEFT(CAST(DIMTARGETDATEID AS varchar(8)),4) as YEAR, SALESTARGETAMOUNT
+    FROM FACT_SRCSALESTARGET
+    WHERE DIMSTOREID <> -1
+  ) a
+INNER JOIN (
+  SELECT DIMSTOREID, SUM(SALESAMOUNT) as SALESAMOUNT, YEAR
+  FROM (
+      SELECT DIM_STORE.STORENUMBER AS DimStoreID, DIMSALEDATEID, SALESAMOUNT, LEFT(CAST(DIMSALEDATEID AS varchar(8)),4) as YEAR
+      FROM FACT_SALESACTUAL
+      Join Dim_Store ON Dim_Store.DimStoreID = Fact_SalesActual.DimStoreID
+    ) 
+    GROUP BY YEAR, DIMSTOREID
+  ) b
+ON a.DIMSTOREID= b.DIMSTOREID
+AND a.YEAR = b.YEAR
+) c 
+INNER JOIN DIM_STORE
+ON c.DIMSTOREID = DIM_STORE.STORENUMBER;
+
+-- DROP VIEW Overall_sales
+
+-- Test View 1
+SELECT * FROM VIEW_Overall_sales
+WHERE DimStoreID In(10,21)
+ORDER BY DimStoreID
+
+------------------------------------------------------------------------------------------------------------------ 
+
+-- View 2
+
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_vs_Target
+AS
+(
+SELECT YEAR, STORENUMBER, SUM(SalesTargetAmount) AS SalesTargetAmount, SUM(SalesAmount) AS SalesAmount, 
+ROUND((SUM(SalesAmount)/SUM(SalesTargetAmount))*100,2) AS TargetAchieved
+FROM 
+(
+SELECT c.Year, b.StoreNumber, SUM(a.SalesTargetAmount) AS SalesTargetAmount, 0 AS SalesAmount
+FROM Fact_SRCSalesTarget a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.StoreNumber
+Inner JOIN Dim_Date c
+  ON a.DimTargetDateID = c.Date_PKEY
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+
+UNION 
+
+SELECT c.Year, b.StoreNumber, 0 AS SalesTargetAmount, SUM(a.SalesAmount) AS SalesAmount
+FROM Fact_SalesActual a
+Inner JOIN Dim_Store b 
+  ON a.DimStoreID = b.DimStoreID
+INNER JOIN Dim_Date c
+  ON a.DimSaleDateID = c.DATE_PKEY 
+WHERE YEAR = 2013 AND StoreNumber in (10,21)
+GROUP BY Year, StoreNumber
+)
+GROUP BY YEAR, STORENUMBER
+ORDER BY YEAR
+);
+    
+--Select * From  VIEW_Sales_vs_Target
+--Drop View VIEW_Sales_vs_Target
+
+------------------------------------------------------------------------------------------------------------------
+
+-- View 3
+
+CREATE OR REPLACE SECURE VIEW VIEW_Sales_by_Day
+AS
+SELECT a.DimStoreID, SUM(SalesAmount) as SalesAmount, c.Day_Name, c.Day_Num_In_Week AS Day_Number
+FROM Fact_SalesActual a 
+    Inner JOIN Dim_Store b
+        ON a.DimStoreID = b.DimStoreID
+    Inner JOIN Dim_Date c
+        ON a.DimSaleDateID = c.Date_PKEY
+        Where a.DimStoreID = 4 OR a.DimStoreID = 6
+    Group by Day_Name, Day_Number, a.DimStoreID
+    ORDER BY Day_Number, DimStoreID;
+    
+--Drop View VIEW_Sales_by_Day
+
+-- Test View 3
+
+SELECT * FROM VIEW_Sales_by_Day
+WHERE Day_Name = 'Friday' OR Day_Name = 'Saturday' OR Day_Name = 'Sunday'
+------------------------------------------------------------------------------------------------------------------
+
+
